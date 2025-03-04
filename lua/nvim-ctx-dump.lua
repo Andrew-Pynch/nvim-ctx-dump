@@ -1,0 +1,1 @@
+return require('nvim-ctx-dump.init')
