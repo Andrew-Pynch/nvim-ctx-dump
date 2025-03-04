@@ -17,7 +17,7 @@ Using [packer.nvim](https://github.com/wbthomason/packer.nvim):
 
 ```lua
 use {
-  'yourusername/nvim-ctx-dump',
+  'andrew-pynch/nvim-ctx-dump',
   config = function()
     require('nvim-ctx-dump').setup()
   end
@@ -28,7 +28,7 @@ Using [lazy.nvim](https://github.com/folke/lazy.nvim):
 
 ```lua
 {
-  'yourusername/nvim-ctx-dump',
+  'andrew-pynch/nvim-ctx-dump',
   config = function()
     require('nvim-ctx-dump').setup()
   end
@@ -45,6 +45,7 @@ Using [lazy.nvim](https://github.com/folke/lazy.nvim):
 - `<leader>cx` - Clear context
 
 When viewing context files:
+
 - `d` - Remove selected file from context
 - `q` - Close context window
 
@@ -56,7 +57,7 @@ You can customize the keybindings when setting up the plugin:
 require('nvim-ctx-dump').setup({
   keymaps = {
     add = "<leader>ca",
-    show = "<leader>cs", 
+    show = "<leader>cs",
     copy = "<leader>cc",
     clear = "<leader>cx",
   }
@@ -72,3 +73,4 @@ The context is automatically saved when you exit Neovim and loaded when you rest
 ## License
 
 MIT
+
