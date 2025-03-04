@@ -20,6 +20,11 @@ function M.show_context()
   local buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_buf_set_option(buf, 'bufhidden', 'wipe')
   
+  -- Disable formatting for this buffer
+  vim.api.nvim_buf_set_option(buf, 'buftype', 'nofile')
+  vim.api.nvim_buf_set_option(buf, 'modifiable', true)
+  vim.api.nvim_buf_set_option(buf, 'filetype', 'nvim-ctx-dump')
+  
   -- Fill buffer with context files
   local lines = {}
   for i, file in ipairs(M.context_files) do
@@ -38,7 +43,11 @@ function M.show_context()
     {noremap = true, silent = true, desc = "Remove file from context"})
   
   vim.api.nvim_buf_set_keymap(buf, 'n', 'q', 
-    [[<cmd>q<CR>]], 
+    [[<cmd>lua require('nvim-ctx-dump').close_context_window()<CR>]], 
+    {noremap = true, silent = true, desc = "Close context window"})
+    
+  vim.api.nvim_buf_set_keymap(buf, 'n', '<Esc>', 
+    [[<cmd>lua require('nvim-ctx-dump').close_context_window()<CR>]], 
     {noremap = true, silent = true, desc = "Close context window"})
   
   -- Create floating window
@@ -58,8 +67,9 @@ function M.show_context()
   vim.api.nvim_buf_set_name(buf, "Context Files")
   vim.api.nvim_win_set_option(win, 'winblend', 10)
   
-  -- Store buffer id for later use
+  -- Store buffer and window id for later use
   M.context_buf = buf
+  M.context_win = win
 end
 
 -- Remove selected file from context
@@ -71,9 +81,22 @@ function M.remove_selected_file()
   local index = tonumber(line_content:match("^(%d+)%."))
   
   if index and M.context_files[index] then
+    local removed_file = vim.fn.fnamemodify(M.context_files[index], ':~:.')
     table.remove(M.context_files, index)
     M.show_context() -- Refresh window
-    vim.notify("Removed file from context")
+    vim.notify("Removed file from context: " .. removed_file)
+  end
+end
+
+-- Close context window
+function M.close_context_window()
+  if M.context_win and vim.api.nvim_win_is_valid(M.context_win) then
+    vim.api.nvim_win_close(M.context_win, true)
+    M.context_win = nil
+  end
+  if M.context_buf and vim.api.nvim_buf_is_valid(M.context_buf) then
+    vim.api.nvim_buf_delete(M.context_buf, { force = true })
+    M.context_buf = nil
   end
 end
 
@@ -85,16 +108,28 @@ function M.copy_to_clipboard()
   end
   
   local content = ""
-  for _, file in ipairs(M.context_files) do
-    -- Add file path
-    content = content .. "### " .. file .. "\n\n"
+  for i, file in ipairs(M.context_files) do
+    -- Add file path with relative format
+    local rel_path = vim.fn.fnamemodify(file, ':~:.')
+    content = content .. "### " .. rel_path .. "\n\n"
     
-    -- Add file content
-    local file_content, err = vim.fn.readfile(file)
-    if err and #err > 0 then
-      content = content .. "Error reading file: " .. err .. "\n\n"
+    -- Try to determine file type for syntax highlighting in markdown
+    local ext = vim.fn.fnamemodify(file, ':e')
+    local lang = ''
+    if ext and ext ~= '' then
+      lang = ext
+    end
+    
+    -- Add file content with language annotation for markdown
+    local file_content = {}
+    local success, err = pcall(function()
+      file_content = vim.fn.readfile(file)
+    end)
+    
+    if not success or (err and #err > 0) then
+      content = content .. "Error reading file: " .. (err or "Unknown error") .. "\n\n"
     else
-      content = content .. table.concat(file_content, '\n') .. "\n\n"
+      content = content .. "```" .. lang .. "\n" .. table.concat(file_content, '\n') .. "\n```\n\n"
     end
   end
   
@@ -142,12 +177,43 @@ function M.load_context()
   end
 end
 
+-- Customize the appearance of context window
+function M.create_highlight_groups()
+  -- Create highlight groups for the context buffer
+  vim.api.nvim_create_augroup("NvimCtxDumpHighlight", { clear = true })
+  
+  -- Create filetype detection for nvim-ctx-dump
+  vim.api.nvim_create_autocmd({ "FileType" }, {
+    group = "NvimCtxDumpHighlight",
+    pattern = "nvim-ctx-dump",
+    callback = function()
+      -- Custom highlighting for context buffer
+      vim.api.nvim_set_hl(0, "CtxDumpHeader", { link = "Title", default = true })
+      vim.api.nvim_set_hl(0, "CtxDumpIndex", { link = "Number", default = true })
+      vim.api.nvim_set_hl(0, "CtxDumpPath", { link = "Directory", default = true })
+      
+      -- Add other UI customizations here
+      vim.opt_local.cursorline = true
+      vim.opt_local.number = false
+      vim.opt_local.signcolumn = "no"
+      
+      -- Prevent formatters from running on this buffer
+      vim.b.conform_disable = 1
+      vim.b.formatting_disabled = true
+      vim.b.disable_autoformat = true
+    end
+  })
+end
+
 -- Setup the plugin
 function M.setup(opts)
   opts = opts or {}
   
   -- Load previous context if it exists
   M.load_context()
+  
+  -- Create highlight groups
+  M.create_highlight_groups()
   
   -- Create default keymaps
   local keymaps = {
