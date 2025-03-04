@@ -6,8 +6,14 @@ A Neovim plugin for managing context collections of files that can be easily cop
 
 - Add files to a persistent context collection
 - View and manage your context files in a floating window
+
+![image](https://github.com/user-attachments/assets/c2792ae7-80ba-4a12-b047-79e5d1a9f42c)
+
 - Remove individual files from the context
-- Copy all context files (paths and contents) to the clipboard
+- Copy all context files (paths and contents) to the clipboard (copies with their full file path, makes it easier for ai's to understand file structure)
+ 
+![image](https://github.com/user-attachments/assets/0be19875-123e-485a-b6cd-404fc139c278)
+
 - Clear the entire context when needed
 - Automatically saves context between Neovim sessions
 - Project-scoped contexts (contexts are separate for each working directory)
