@@ -233,8 +233,8 @@ function M.load_context()
 			local ok, decoded = pcall(vim.fn.json_decode, content)
 			if ok and type(decoded) == "table" then
 				M.contexts = decoded
-				vim.notify("Contexts loaded from " .. save_path, vim.log.levels.INFO)
-				vim.notify("Loaded contexts: " .. vim.inspect(M.contexts), vim.log.levels.DEBUG)
+				-- vim.notify("Contexts loaded from " .. save_path, vim.log.levels.INFO)
+				-- vim.notify("Loaded contexts: " .. vim.inspect(M.contexts), vim.log.levels.DEBUG)
 			else
 				vim.notify("Failed to decode context file: " .. tostring(decoded), vim.log.levels.ERROR)
 				M.contexts = {} -- Reset to empty on failure
