@@ -1,21 +1,48 @@
 local M = {}
 
--- Core data structure
-M.context_files = {}
+-- Core data structure - folder-scoped contexts
+M.contexts = {}
 
--- Add current file to context
+-- Get current working directory key with path normalization
+function M.get_cwd_key()
+	local cwd = vim.fn.resolve(vim.fn.getcwd())
+	vim.notify("Current cwd key: " .. cwd, vim.log.levels.DEBUG)
+	return cwd
+end
+
+-- Initialize context for current directory if needed
+function M.ensure_context_exists()
+	local cwd = M.get_cwd_key()
+	if not M.contexts[cwd] then
+		M.contexts[cwd] = {}
+	end
+	return M.contexts[cwd]
+end
+
+-- Get current context files
+function M.get_context_files()
+	return M.ensure_context_exists()
+end
+
+-- Add current file to context with resolved path
 function M.add_to_context()
-	local current_file = vim.fn.expand("%:p")
-	if not vim.tbl_contains(M.context_files, current_file) then
-		table.insert(M.context_files, current_file)
-		vim.notify("Added to context: " .. vim.fn.fnamemodify(current_file, ":~:."))
+	local current_file = vim.fn.resolve(vim.fn.expand("%:p"))
+	local context_files = M.get_context_files()
+
+	if not vim.tbl_contains(context_files, current_file) then
+		table.insert(context_files, current_file)
+		vim.notify("Added to context: " .. vim.fn.fnamemodify(current_file, ":~:."), vim.log.levels.INFO)
 	else
-		vim.notify("File already in context")
+		vim.notify("File already in context", vim.log.levels.INFO)
 	end
 end
 
 -- Show context files in a floating window
 function M.show_context()
+	local context_files = M.get_context_files()
+	vim.notify("Showing context for: " .. M.get_cwd_key(), vim.log.levels.DEBUG)
+	vim.notify("Context files: " .. vim.inspect(context_files), vim.log.levels.DEBUG)
+
 	-- Create buffer
 	local buf = vim.api.nvim_create_buf(false, true)
 	vim.api.nvim_buf_set_option(buf, "bufhidden", "wipe")
@@ -27,7 +54,7 @@ function M.show_context()
 
 	-- Fill buffer with context files
 	local lines = {}
-	for i, file in ipairs(M.context_files) do
+	for i, file in ipairs(context_files) do
 		table.insert(lines, i .. ". " .. vim.fn.fnamemodify(file, ":~:."))
 	end
 
@@ -62,6 +89,14 @@ function M.show_context()
 		{ noremap = true, silent = true, desc = "Close context window" }
 	)
 
+	vim.api.nvim_buf_set_keymap(
+		buf,
+		"n",
+		"<CR>",
+		[[<cmd>lua require('nvim-ctx-dump').open_selected_file()<CR>]],
+		{ noremap = true, silent = true, desc = "Open selected file" }
+	)
+
 	-- Create floating window
 	local width = math.min(80, vim.o.columns - 4)
 	local height = math.min(#lines + 2, vim.o.lines - 4)
@@ -89,19 +124,36 @@ function M.remove_selected_file()
 	local line_num = vim.fn.line(".")
 	local line_content = vim.api.nvim_get_current_line()
 	local index = tonumber(line_content:match("^(%d+)%."))
-	if index and M.context_files[index] then
-		local removed_file = vim.fn.fnamemodify(M.context_files[index], ":~:.")
-		table.remove(M.context_files, index)
+	local context_files = M.get_context_files()
+
+	if index and context_files[index] then
+		local removed_file = vim.fn.fnamemodify(context_files[index], ":~:.")
+		table.remove(context_files, index)
+
 		-- Update the existing buffer with the new list of files
 		local new_lines = {}
-		for i, file in ipairs(M.context_files) do
+		for i, file in ipairs(context_files) do
 			table.insert(new_lines, i .. ". " .. vim.fn.fnamemodify(file, ":~:."))
 		end
 		if #new_lines == 0 then
 			table.insert(new_lines, "No files in context")
 		end
 		vim.api.nvim_buf_set_lines(M.context_buf, 0, -1, false, new_lines)
-		vim.notify("Removed file from context: " .. removed_file)
+		vim.notify("Removed file from context: " .. removed_file, vim.log.levels.INFO)
+	end
+end
+
+-- Open selected file
+function M.open_selected_file()
+	local line_num = vim.fn.line(".")
+	local line_content = vim.api.nvim_get_current_line()
+	local index = tonumber(line_content:match("^(%d+)%."))
+	local context_files = M.get_context_files()
+
+	if index and context_files[index] then
+		local file_path = context_files[index]
+		M.close_context_window()
+		vim.cmd("edit " .. vim.fn.fnameescape(file_path))
 	end
 end
 
@@ -119,31 +171,26 @@ end
 
 -- Copy all context files and their contents to clipboard
 function M.copy_to_clipboard()
-	if #M.context_files == 0 then
-		vim.notify("No files in context to copy")
+	local context_files = M.get_context_files()
+	if #context_files == 0 then
+		vim.notify("No files in context to copy", vim.log.levels.WARN)
 		return
 	end
 
 	local content = ""
-	for i, file in ipairs(M.context_files) do
-		-- Add file path with relative format
+	for i, file in ipairs(context_files) do
 		local rel_path = vim.fn.fnamemodify(file, ":~:.")
 		content = content .. "### " .. rel_path .. "\n\n"
 
-		-- Try to determine file type for syntax highlighting in markdown
 		local ext = vim.fn.fnamemodify(file, ":e")
-		local lang = ""
-		if ext and ext ~= "" then
-			lang = ext
-		end
+		local lang = ext ~= "" and ext or ""
 
-		-- Add file content with language annotation for markdown
 		local file_content = {}
 		local success, err = pcall(function()
 			file_content = vim.fn.readfile(file)
 		end)
 
-		if not success or (err and #err > 0) then
+		if not success then
 			content = content .. "Error reading file: " .. (err or "Unknown error") .. "\n\n"
 		else
 			content = content .. "```" .. lang .. "\n" .. table.concat(file_content, "\n") .. "\n```\n\n"
@@ -151,13 +198,14 @@ function M.copy_to_clipboard()
 	end
 
 	vim.fn.setreg("+", content)
-	vim.notify("Copied " .. #M.context_files .. " files to clipboard")
+	vim.notify("Copied " .. #context_files .. " files to clipboard", vim.log.levels.INFO)
 end
 
 -- Clear all files from context
 function M.clear_context()
-	M.context_files = {}
-	vim.notify("Context cleared")
+	local cwd = M.get_cwd_key()
+	M.contexts[cwd] = {}
+	vim.notify("Context cleared", vim.log.levels.INFO)
 end
 
 -- Save context to a file
@@ -165,11 +213,12 @@ function M.save_context()
 	local save_path = vim.fn.stdpath("data") .. "/nvim-ctx-dump.json"
 	local file = io.open(save_path, "w")
 	if file then
-		file:write(vim.fn.json_encode(M.context_files))
+		file:write(vim.fn.json_encode(M.contexts))
 		file:close()
-		vim.notify("Context saved to " .. save_path)
+		vim.notify("Contexts saved to " .. save_path, vim.log.levels.INFO)
+		vim.notify("Saved contexts: " .. vim.inspect(M.contexts), vim.log.levels.DEBUG)
 	else
-		vim.notify("Failed to save context", vim.log.levels.ERROR)
+		vim.notify("Failed to save contexts to " .. save_path, vim.log.levels.ERROR)
 	end
 end
 
@@ -183,38 +232,36 @@ function M.load_context()
 		if content and #content > 0 then
 			local ok, decoded = pcall(vim.fn.json_decode, content)
 			if ok and type(decoded) == "table" then
-				M.context_files = decoded
-				vim.notify("Context loaded from " .. save_path)
+				M.contexts = decoded
+				vim.notify("Contexts loaded from " .. save_path, vim.log.levels.INFO)
+				vim.notify("Loaded contexts: " .. vim.inspect(M.contexts), vim.log.levels.DEBUG)
 			else
-				vim.notify("Failed to decode context file", vim.log.levels.ERROR)
+				vim.notify("Failed to decode context file: " .. tostring(decoded), vim.log.levels.ERROR)
+				M.contexts = {} -- Reset to empty on failure
 			end
+		else
+			vim.notify("Empty context file found at " .. save_path, vim.log.levels.INFO)
+			M.contexts = {}
 		end
 	else
-		vim.notify("No saved context found", vim.log.levels.INFO)
+		vim.notify("No saved contexts found at " .. save_path, vim.log.levels.INFO)
+		M.contexts = {}
 	end
 end
 
 -- Customize the appearance of context window
 function M.create_highlight_groups()
-	-- Create highlight groups for the context buffer
 	vim.api.nvim_create_augroup("NvimCtxDumpHighlight", { clear = true })
-
-	-- Create filetype detection for nvim-ctx-dump
 	vim.api.nvim_create_autocmd({ "FileType" }, {
 		group = "NvimCtxDumpHighlight",
 		pattern = "nvim-ctx-dump",
 		callback = function()
-			-- Custom highlighting for context buffer
 			vim.api.nvim_set_hl(0, "CtxDumpHeader", { link = "Title", default = true })
 			vim.api.nvim_set_hl(0, "CtxDumpIndex", { link = "Number", default = true })
 			vim.api.nvim_set_hl(0, "CtxDumpPath", { link = "Directory", default = true })
-
-			-- Add other UI customizations here
 			vim.opt_local.cursorline = true
 			vim.opt_local.number = false
 			vim.opt_local.signcolumn = "no"
-
-			-- Prevent formatters from running on this buffer
 			vim.b.conform_disable = 1
 			vim.b.formatting_disabled = true
 			vim.b.disable_autoformat = true

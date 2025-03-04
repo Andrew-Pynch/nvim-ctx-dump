@@ -10,6 +10,8 @@ A Neovim plugin for managing context collections of files that can be easily cop
 - Copy all context files (paths and contents) to the clipboard
 - Clear the entire context when needed
 - Automatically saves context between Neovim sessions
+- Project-scoped contexts (contexts are separate for each working directory)
+- Open files directly from the context menu by pressing Enter
 
 ## Installation
 
@@ -48,6 +50,7 @@ When viewing context files:
 
 - `d` - Remove selected file from context
 - `q` - Close context window
+- `<Enter>` - Open selected file
 
 ### Configuration
 
@@ -66,9 +69,9 @@ require('nvim-ctx-dump').setup({
 
 ## How It Works
 
-The plugin maintains an internal list of file paths that you've added to your context. When you copy the context to clipboard, it formats both the file paths and their contents into a single string, which is then placed in your clipboard.
+The plugin maintains a project-scoped collection of file paths that you've added to your context. Each working directory has its own separate context. When you copy the context to clipboard, it formats both the file paths and their contents into a single string, which is then placed in your clipboard.
 
-The context is automatically saved when you exit Neovim and loaded when you restart, providing persistence between sessions.
+The contexts are automatically saved when you exit Neovim and loaded when you restart, providing persistence between sessions.
 
 ## License
 
