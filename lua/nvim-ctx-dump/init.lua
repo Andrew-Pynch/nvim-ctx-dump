@@ -6,7 +6,6 @@ M.contexts = {}
 -- Get current working directory key with path normalization
 function M.get_cwd_key()
 	local cwd = vim.fn.resolve(vim.fn.getcwd())
-	vim.notify("Current cwd key: " .. cwd, vim.log.levels.DEBUG)
 	return cwd
 end
 
@@ -40,8 +39,6 @@ end
 -- Show context files in a floating window
 function M.show_context()
 	local context_files = M.get_context_files()
-	vim.notify("Showing context for: " .. M.get_cwd_key(), vim.log.levels.DEBUG)
-	vim.notify("Context files: " .. vim.inspect(context_files), vim.log.levels.DEBUG)
 
 	-- Create buffer
 	local buf = vim.api.nvim_create_buf(false, true)
