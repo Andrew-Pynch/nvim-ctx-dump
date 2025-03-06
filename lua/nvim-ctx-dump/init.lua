@@ -201,6 +201,24 @@ function M.copy_to_clipboard()
 	vim.notify("Copied " .. #context_files .. " files to clipboard", vim.log.levels.INFO)
 end
 
+-- Copy only the file paths to clipboard
+function M.copy_paths_to_clipboard()
+	local context_files = M.get_context_files()
+	if #context_files == 0 then
+		vim.notify("No files in context to copy", vim.log.levels.WARN)
+		return
+	end
+
+	local content = ""
+	for i, file in ipairs(context_files) do
+		local rel_path = vim.fn.fnamemodify(file, ":~:.")
+		content = content .. rel_path .. "\n"
+	end
+
+	vim.fn.setreg("+", content)
+	vim.notify("Copied " .. #context_files .. " file paths to clipboard", vim.log.levels.INFO)
+end
+
 -- Clear all files from context
 function M.clear_context()
 	local cwd = M.get_cwd_key()
@@ -284,6 +302,7 @@ function M.setup(opts)
 		add = "<leader>ca",
 		show = "<leader>cs",
 		copy = "<leader>cc",
+		copy_paths = "<leader>cp",
 		clear = "<leader>cx",
 	}
 
@@ -309,6 +328,13 @@ function M.setup(opts)
 		keymaps.copy,
 		M.copy_to_clipboard,
 		{ noremap = true, silent = true, desc = "Copy context to clipboard" }
+	)
+	
+	vim.keymap.set(
+		"n",
+		keymaps.copy_paths,
+		M.copy_paths_to_clipboard,
+		{ noremap = true, silent = true, desc = "Copy context file paths to clipboard" }
 	)
 
 	vim.keymap.set("n", keymaps.clear, M.clear_context, { noremap = true, silent = true, desc = "Clear context" })

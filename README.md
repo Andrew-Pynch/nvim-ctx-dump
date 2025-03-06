@@ -14,6 +14,7 @@ A Neovim plugin for managing context collections of files that can be easily cop
  
 ![image](https://github.com/user-attachments/assets/0be19875-123e-485a-b6cd-404fc139c278)
 
+- Copy only the file paths to the clipboard (without file contents)
 - Clear the entire context when needed
 - Automatically saves context between Neovim sessions
 - Project-scoped contexts (contexts are separate for each working directory)
@@ -50,6 +51,7 @@ Using [lazy.nvim](https://github.com/folke/lazy.nvim):
 - `<leader>ca` - Add current file to context
 - `<leader>cs` - Show context files
 - `<leader>cc` - Copy context to clipboard
+- `<leader>cp` - Copy context file paths to clipboard
 - `<leader>cx` - Clear context
 
 When viewing context files:
@@ -68,6 +70,7 @@ require('nvim-ctx-dump').setup({
     add = "<leader>ca",
     show = "<leader>cs",
     copy = "<leader>cc",
+    copy_paths = "<leader>cp",
     clear = "<leader>cx",
   }
 })
